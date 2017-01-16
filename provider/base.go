@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"active-proxy/pool"
+	"active-proxy/util"
 )
 
 type ProviderState int
@@ -79,7 +79,7 @@ type ProxyProvider interface {
 
 // BaseProxyProvider should be inherited by providers
 type BaseProxyProvider struct {
-	Pool *pool.ProxyTaskPool
+	Pool *util.ProxyTaskPool
 
 	Conf      ProviderConf
 	State     ProviderState

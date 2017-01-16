@@ -1,0 +1,43 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "HmbftipkadrLlCfzzVQ+iFHbl6g=",
+			"path": "github.com/golang/glog",
+			"revision": "23def4e6c14b4da8ac2ed8007337bc5eb5007998",
+			"revisionTime": "2016-01-25T20:49:56Z"
+		},
+		{
+			"checksumSHA1": "kBeNcaKk56FguvPSUCEaH6AxpRc=",
+			"path": "github.com/golang/protobuf/proto",
+			"revision": "8ee79997227bf9b34611aee7946ae64735e6fd93",
+			"revisionTime": "2016-11-17T03:31:26Z"
+		},
+		{
+			"checksumSHA1": "5SYLEhADhdBVZAGPVHWggQl7H8k=",
+			"path": "github.com/samuel/go-zookeeper/zk",
+			"revision": "1d7be4effb13d2d908342d349d71a284a7542693",
+			"revisionTime": "2016-10-28T23:23:40Z"
+		},
+		{
+			"checksumSHA1": "2bLk/+qSRrzctGuDCiCPygXbUQQ=",
+			"path": "github.com/spf13/cobra",
+			"revision": "1dd5ff2e11b6dca62fdcb275eb804b94607d8b06",
+			"revisionTime": "2016-09-04T11:42:13Z"
+		},
+		{
+			"checksumSHA1": "fn2RXBJHGT8onLag0VhoEFwIVQU=",
+			"path": "github.com/urfave/negroni",
+			"revision": "43335025fafdef38d209080c1c67f5dff60b969a",
+			"revisionTime": "2016-12-27T17:44:11Z"
+		},
+		{
+			"checksumSHA1": "12GqsW8PiRPnezDDy0v4brZrndM=",
+			"path": "gopkg.in/yaml.v2",
+			"revision": "a5b47d31c556af34a302ce5d659e6fea44d90de0",
+			"revisionTime": "2016-09-28T15:37:09Z"
+		}
+	],
+	"rootPath": "active-proxy"
+}

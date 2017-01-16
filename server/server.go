@@ -1,68 +1,43 @@
-package main
+package server
 
 import (
 	"encoding/json"
-	"flag"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"active-proxy/log"
 	"active-proxy/middleware"
-	"active-proxy/pool"
 	. "active-proxy/provider"
+	"active-proxy/util"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/golang/glog"
 	"github.com/urfave/negroni"
-	"gopkg.in/yaml.v2"
 )
-
-func main() {
-	// parse flag
-	var configFile string
-	flag.StringVar(&configFile, "config", "config.yaml", "location of config file")
-	flag.Parse()
-
-	// init proxy conf
-	conf, err := NewProxyConf(configFile)
-	if err != nil {
-		log.Error("Error init proxy configuration: ", err)
-		return
-	}
-
-	// init logger
-	level, _ := logrus.ParseLevel(strings.ToLower(conf.LogLevel))
-	log.SetLevel(level)
-	log.SetFormatter(&logrus.TextFormatter{FullTimestamp: true})
-	log.Infof("ProxyConf: %+v", conf)
-
-	// init proxy server
-	proxyServer, _ := NewProxyServer(*conf)
-	proxyServer.StartServer()
-}
 
 type ProxyServer struct {
 	proxyConf            ProxyConf
 	providers            map[ProviderType]ProxyProvider
-	pools                map[ProviderType]*pool.ProxyTaskPool
+	pools                map[ProviderType]*util.ProxyTaskPool
 	statisticsMiddleware *middleware.StatisticsMiddleware
 }
 
 func NewProxyServer(conf ProxyConf) (*ProxyServer, error) {
 	server := &ProxyServer{proxyConf: conf}
 	server.providers = make(map[ProviderType]ProxyProvider)
-	server.pools = make(map[ProviderType]*pool.ProxyTaskPool)
+	server.pools = make(map[ProviderType]*util.ProxyTaskPool)
 
 	hdfsProvider, err := NewHdfsProxyProvider(conf.ProviderConfs[HDFS])
+	if err != nil {
+		return nil, err
+	}
 	server.providers[HDFS] = hdfsProvider
 	server.pools[HDFS] = hdfsProvider.Pool
 
 	server.statisticsMiddleware = middleware.NewStatisticsMiddleware(conf.RecentRequestNums)
 
-	return server, err
+	return server, nil
 }
 
 func (server *ProxyServer) StartServer() {
@@ -103,7 +78,7 @@ func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Reques
 			time.Sleep(time.Millisecond * time.Duration(server.proxyConf.RetryDelay))
 		}
 	}
-	log.Warnf("Request %s still failed after retrying %d times.", r.RequestURI, server.proxyConf.RetryAttempts)
+	glog.V(2).Infof("Request %s still failed after retrying %d times.", r.RequestURI, server.proxyConf.RetryAttempts)
 }
 
 func convertResponseBody2String(response *http.Response) string {
@@ -129,6 +104,7 @@ const (
 	WEBHDFS_PREFIX = "/webhdfs/v1"
 )
 
+// decide proxy provider type according to some rules
 func getProxyProviderType(urlPath string) ProviderType {
 	switch {
 	case strings.HasPrefix(urlPath, WEBHDFS_PREFIX):
@@ -136,64 +112,4 @@ func getProxyProviderType(urlPath string) ProviderType {
 	default:
 		return DEFAULT
 	}
-}
-
-type ProxyConf struct {
-	GlobalConf
-	ConfigFile string
-}
-
-type GlobalConf struct {
-	LogLevel          string
-	ProxyServerPort   string
-	RetryAttempts     int
-	RetryDelay        int
-	RecentRequestNums int
-
-	ProviderConfs map[ProviderType]ProviderConf
-}
-
-func NewProxyConf(filePath string) (*ProxyConf, error) {
-	absFilePath, _ := filepath.Abs(filePath)
-	data, err := ioutil.ReadFile(absFilePath)
-	if err != nil {
-		return nil, err
-	}
-	m := make(map[string]interface{})
-	err = yaml.Unmarshal(data, &m)
-	if err != nil {
-		return nil, err
-	}
-
-	globalConf := convert2ProviderConf(m["GLOBAL"].(map[interface{}]interface{}))
-	hdfsConf := convert2ProviderConf(m["HDFS"].(map[interface{}]interface{}))
-
-	logLevel := globalConf.GetString("PROXY_LOG_LEVEL")
-	proxyPort := globalConf.GetString("PROXY_SERVER_PORT")
-	retryAttempts := globalConf.GetInt("PROXY_RETRY_ATTEMPTS")
-	retryDelay := globalConf.GetInt("PROXY_RETRY_DELAY")
-	recentRequestNums := globalConf.GetInt("PROXY_RECENT_REQUEST_NUMS")
-
-	providerConfs := make(map[ProviderType]ProviderConf)
-	providerConfs[HDFS] = hdfsConf
-
-	return &ProxyConf{
-		GlobalConf: GlobalConf{
-			LogLevel:          logLevel,
-			ProxyServerPort:   ":" + proxyPort,
-			RetryAttempts:     retryAttempts,
-			RetryDelay:        retryDelay,
-			RecentRequestNums: recentRequestNums,
-			ProviderConfs:     providerConfs,
-		},
-		ConfigFile: absFilePath,
-	}, nil
-}
-
-func convert2ProviderConf(m map[interface{}]interface{}) ProviderConf {
-	conf := make(map[string]interface{})
-	for key, value := range m {
-		conf[key.(string)] = value
-	}
-	return ProviderConf(conf)
 }

@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"active-proxy/log"
-	"active-proxy/pool"
 	"active-proxy/provider/hadoop_hdfs"
 	zkClient "active-proxy/provider/zk"
+	"active-proxy/util"
 
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/samuel/go-zookeeper/zk"
 )
@@ -44,7 +44,7 @@ func NewHdfsProxyProvider(conf ProviderConf) (*HdfsProxyProvider, error) {
 		},
 		zkLockPath: conf.GetString(ZK_LOCK_PATH_CONF_KEY),
 	}
-	provider.Pool, _ = pool.NewProxyTaskPool(conf.GetInt(MAX_CONNECTIONS_CONF_KEY))
+	provider.Pool, _ = util.NewProxyTaskPool(conf.GetInt(MAX_CONNECTIONS_CONF_KEY))
 	go provider.Pool.Do()
 
 	provider.initWg.Add(2)
@@ -65,7 +65,7 @@ func (provider *HdfsProxyProvider) resolveActiveNodeInfo(client *zkClient.ZKClie
 		activeNNInfo := &hadoop_hdfs.ActiveNodeInfo{}
 		proto.Unmarshal(data, activeNNInfo)
 		if provider.activeNNAddress != activeNNInfo.GetHostname() {
-			log.Infof("hdfs proxy provider: active namenode address changes from %s to %s.", provider.activeNNAddress, activeNNInfo.GetHostname())
+			glog.V(1).Infof("hdfs proxy provider: active namenode address changes from %s to %s.", provider.activeNNAddress, activeNNInfo.GetHostname())
 			provider.activeNNAddress = activeNNInfo.GetHostname()
 		}
 		return true, ch
@@ -146,9 +146,9 @@ func (provider *HdfsProxyProvider) GetStats() ProviderStats {
 	case START:
 		stats.Explain = "hdfs proxy is in service"
 	case STOP:
-		stats.Explain = "maybe active namenode election is taking place"
+		stats.Explain = "perhaps namenode election is taking place, or all namenodes are dead"
 	default:
-		stats.Explain = "do not know what happened"
+		stats.Explain = "perhaps all namenodes are dead"
 	}
 	return stats
 }

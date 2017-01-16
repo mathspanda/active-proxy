@@ -57,7 +57,7 @@ func (m *StatisticsMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request
 		Status:     http.StatusText(respRecorder.statusCode),
 		Method:     r.Method,
 		Host:       r.Host,
-		Path:       r.URL.Path,
+		Path:       r.URL.String(),
 		Delay:      time.Now().Sub(begin),
 	})
 	if len(m.recentRequests) > m.numRecentRequests {
