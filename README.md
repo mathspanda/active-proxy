@@ -1,12 +1,7 @@
-## active-proxy
+## active-proxy (acproxy)
 a proxy aims to interacting with hadoop clusters, seems like API Gateway, which supports:
 
 * proxy webhdfs request to active namenode instead of standby namenode (if send requests to standby namenode, standbyexception will return)
-
-```
-go run server.go -config="examples/config.yaml"
-# configuration can be set in config.yaml, or overrided by environment variables
-```
 
 ### interfaces
 
