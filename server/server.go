@@ -19,14 +19,14 @@ import (
 type ProxyServer struct {
 	proxyConf            ProxyConf
 	providers            map[ProviderType]ProxyProvider
-	pools                map[ProviderType]*util.ProxyTaskPool
+	pools                map[ProviderType]util.ProxyTaskPoolInterface
 	statisticsMiddleware *middleware.StatisticsMiddleware
 }
 
 func NewProxyServer(conf ProxyConf) (*ProxyServer, error) {
 	server := &ProxyServer{proxyConf: conf}
 	server.providers = make(map[ProviderType]ProxyProvider)
-	server.pools = make(map[ProviderType]*util.ProxyTaskPool)
+	server.pools = make(map[ProviderType]util.ProxyTaskPoolInterface)
 
 	hdfsProvider, err := NewHdfsProxyProvider(conf.ProviderConfs[HDFS])
 	if err != nil {
@@ -82,9 +82,12 @@ func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Reques
 }
 
 func convertResponseBody2String(response *http.Response) string {
-	body, _ := ioutil.ReadAll(response.Body)
-	defer response.Body.Close()
-	return string(body)
+	if response.Body != nil {
+		body, _ := ioutil.ReadAll(response.Body)
+		defer response.Body.Close()
+		return string(body)
+	}
+	return ""
 }
 
 func (server *ProxyServer) StatesHandler(rw http.ResponseWriter, r *http.Request) {

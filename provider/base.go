@@ -12,18 +12,18 @@ type ProviderState int
 
 const (
 	INIT = ProviderState(iota)
-	START
-	STOP
+	RUN
+	PEND
 )
 
 func (state ProviderState) String() string {
 	switch state {
 	case INIT:
-		return "init"
-	case START:
-		return "start"
-	case STOP:
-		return "stop"
+		return "initing"
+	case RUN:
+		return "running"
+	case PEND:
+		return "pending"
 	default:
 		return "unknown"
 	}
@@ -79,12 +79,11 @@ type ProxyProvider interface {
 
 // BaseProxyProvider should be inherited by providers
 type BaseProxyProvider struct {
-	Pool *util.ProxyTaskPool
-
 	Conf      ProviderConf
 	State     ProviderState
 	StateChan chan ProviderState
 	Type      ProviderType
+	Pool      util.ProxyTaskPoolInterface
 }
 
 func NewProxyRequest(req *http.Request, urlStr string) (*http.Request, error) {

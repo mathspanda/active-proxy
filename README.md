@@ -1,17 +1,29 @@
 ## active-proxy (acproxy)
 a proxy aims to interacting with hadoop clusters, seems like API Gateway, which supports:
 
-* proxy webhdfs request to active namenode instead of standby namenode (if send requests to standby namenode, standbyexception will return)
+ proxy webhdfs request to active namenode instead of standby namenode (if send requests to standby namenode, standbyexception will return)
+
+```
+go run acproxy.go --config_file="examples/config.yaml" --log_dir="/var/log" --v=1 --alsologtostderr=true
+# configuration can be set in config.yaml, or overrided by environment variables
+
+Flags:
+      --alsologtostderr                  log to standard error as well as files
+  -c, --config_file string               set location of config file (default "examples/config.yaml")
+      --log_dir string                   If non-empty, write log files in this directory
+      --logtostderr                      log to standard error instead of files
+  -v, --v Level                          log level for V logs
+```
 
 ### interfaces
 
 #### 1. ip:port/states
-get states of different proxy providers
+get states of different proxy providers, which temporarily has only three states: **initing, running and pending**
 ```
  curl ip:port/states
  {
     "hdfs_proxy_provider": {
-        "provider_state": "start",
+        "provider_state": "running",
         "state_explanation": "hdfs proxy is in service"
     }
  }

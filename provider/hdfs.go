@@ -27,11 +27,11 @@ type HdfsProxyProvider struct {
 }
 
 const (
-	ZK_SERVERS_CONF_KEY      = "HDFS_ZK_SERVERS"
-	ZK_LOCK_PATH_CONF_KEY    = "HDFS_ZK_LOCK_PATH"
-	MAX_CONNECTIONS_CONF_KEY = "HDFS_MAX_CONNECTIONS"
-	WEBHDFS_PORT_CONF_KEY    = "HDFS_WEBHDFS_PORT"
-	REQUEST_TIMEOUT_CONF_KEY = "HDFS_REQUEST_TIMEOUT"
+	ZkServersConfKey      = "HDFS_ZK_SERVERS"
+	ZkLockPathConfKey     = "HDFS_ZK_LOCK_PATH"
+	MaxConnectionsConfKey = "HDFS_MAX_CONNECTIONS"
+	WebHdfsPortConfKey    = "HDFS_WEBHDFS_PORT"
+	RequestTimeoutConfKey = "HDFS_REQUEST_TIMEOUT"
 )
 
 func NewHdfsProxyProvider(conf ProviderConf) (*HdfsProxyProvider, error) {
@@ -42,9 +42,9 @@ func NewHdfsProxyProvider(conf ProviderConf) (*HdfsProxyProvider, error) {
 			State:     INIT,
 			StateChan: make(chan ProviderState),
 		},
-		zkLockPath: conf.GetString(ZK_LOCK_PATH_CONF_KEY),
+		zkLockPath: conf.GetString(ZkLockPathConfKey),
 	}
-	provider.Pool, _ = util.NewProxyTaskPool(conf.GetInt(MAX_CONNECTIONS_CONF_KEY))
+	provider.Pool, _ = util.NewProxyTaskPool(conf.GetInt(MaxConnectionsConfKey))
 	go provider.Pool.Do()
 
 	provider.initWg.Add(2)
@@ -74,26 +74,26 @@ func (provider *HdfsProxyProvider) resolveActiveNodeInfo(client *zkClient.ZKClie
 }
 
 func (provider *HdfsProxyProvider) monitorZkLockPath() {
-	zkServers := strings.Split(provider.Conf.GetString(ZK_SERVERS_CONF_KEY), ",")
+	zkServers := strings.Split(provider.Conf.GetString(ZkServersConfKey), ",")
 	client, _ := zkClient.NewZKClient(zkServers, 1)
 	success, ch := provider.resolveActiveNodeInfo(client)
 	if success {
-		provider.StateChan <- START
+		provider.StateChan <- RUN
 	}
 	provider.initWg.Done()
 	for {
 		select {
 		case e := <-ch:
 			if e.Type == zk.EventNodeDeleted {
-				provider.StateChan <- STOP
+				provider.StateChan <- PEND
 			}
 			_, ch = provider.resolveActiveNodeInfo(client)
 
 		case <-time.After(time.Duration(3) * time.Second):
 			success, ch = provider.resolveActiveNodeInfo(client)
 			provider.mutex.RLock()
-			if success && provider.State != START {
-				provider.StateChan <- START
+			if success && provider.State != RUN {
+				provider.StateChan <- RUN
 			}
 			provider.mutex.RUnlock()
 		}
@@ -105,11 +105,8 @@ func (provider *HdfsProxyProvider) monitorProviderState() {
 	for {
 		state := <-provider.StateChan
 		provider.mutex.Lock()
-		switch state {
-		case STOP:
-			provider.State = STOP
-		case START:
-			provider.State = START
+		if provider.State != state {
+			provider.State = state
 		}
 		provider.mutex.Unlock()
 	}
@@ -119,15 +116,15 @@ func (provider *HdfsProxyProvider) Proxy(r *http.Request) (*http.Response, error
 	provider.mutex.RLock()
 	defer provider.mutex.RUnlock()
 
-	if provider.State == STOP {
+	if provider.State == PEND {
 		return nil, errors.New("hdfs proxy provider not in service temporarily")
 	}
 
-	webhdfsPort := provider.Conf.GetString(WEBHDFS_PORT_CONF_KEY)
+	webhdfsPort := provider.Conf.GetString(WebHdfsPortConfKey)
 	urlStr := fmt.Sprintf("%s://%s:%s%s", "http", provider.activeNNAddress, webhdfsPort, r.RequestURI)
 	proxyReq, _ := NewProxyRequest(r, urlStr)
 	select {
-	case <-time.After(time.Millisecond * time.Duration(provider.Conf.GetInt(REQUEST_TIMEOUT_CONF_KEY))):
+	case <-time.After(time.Millisecond * time.Duration(provider.Conf.GetInt(RequestTimeoutConfKey))):
 		return nil, errors.New(fmt.Sprintf("request %s timeout", r.RequestURI))
 
 	case resp := <-provider.Pool.Push(proxyReq):
@@ -143,9 +140,9 @@ func (provider *HdfsProxyProvider) GetStats() ProviderStats {
 
 	stats := ProviderStats{State: provider.State.String()}
 	switch provider.State {
-	case START:
+	case RUN:
 		stats.Explain = "hdfs proxy is in service"
-	case STOP:
+	case PEND:
 		stats.Explain = "perhaps namenode election is taking place, or all namenodes are dead"
 	default:
 		stats.Explain = "perhaps all namenodes are dead"

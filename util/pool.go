@@ -14,6 +14,11 @@ type ProxyTask struct {
 	RespChan chan ProxyTaskResult
 }
 
+type ProxyTaskPoolInterface interface {
+	Push(request *http.Request) <-chan ProxyTaskResult
+	Do()
+}
+
 type ProxyTaskPool struct {
 	taskChan chan ProxyTask // accept task
 	doChan   chan int       // limit task numbers
@@ -21,7 +26,7 @@ type ProxyTaskPool struct {
 	LimitTaskNum int
 }
 
-func NewProxyTaskPool(maxTaskNum int) (*ProxyTaskPool, error) {
+func NewProxyTaskPool(maxTaskNum int) (ProxyTaskPoolInterface, error) {
 	pool := &ProxyTaskPool{LimitTaskNum: maxTaskNum}
 	pool.taskChan = make(chan ProxyTask, maxTaskNum)
 	pool.doChan = make(chan int, maxTaskNum)

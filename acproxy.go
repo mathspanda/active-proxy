@@ -12,14 +12,14 @@ import (
 func main() {
 	defer glog.Flush()
 
-	mainCmd := cmd.NewProxyCommand(StartServer)
+	mainCmd := cmd.NewProxyCommand(Start)
 	if err := mainCmd.Execute(); err != nil {
 		glog.Errorln("Command error: ", err)
 		os.Exit(-1)
 	}
 }
 
-func StartServer(configFile string) {
+func Start(configFile string) {
 	conf, err := NewProxyConf(configFile)
 	if err != nil {
 		glog.Errorln("Error init proxy configuration: ", err)

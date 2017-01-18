@@ -1,31 +1,31 @@
 package cmd
 
 import (
+	"flag"
+
 	"github.com/spf13/cobra"
 )
 
 type Option struct {
-	configFile string
-	logDir     string
+	ConfigFile string
 }
 
 const (
 	CONFIG_FILE_DEFAULT = "examples/config.yaml"
-	LOG_DIR_DEFAULT     = "/var/log/acproxy"
 )
 
 func NewProxyCommand(startFunc func(configFile string)) *cobra.Command {
 	option := &Option{}
 	cmd := &cobra.Command{
 		Use:   "acproxy",
-		Short: "acproxy is a proxy",
-		Long:  "acproxy is a proxy",
+		Short: "acproxy is a proxy interacting with active hdfs",
+		Long:  "a proxy aims to interact with Hadoop clusters, which supports hdfs temporarily",
 		Run: func(cmd *cobra.Command, args []string) {
-			startFunc(option.configFile)
+			startFunc(option.ConfigFile)
 		},
 	}
-	cmd.Flags().StringVarP(&option.logDir, "log_dir", "d", LOG_DIR_DEFAULT, "set location of log dir")
-	cmd.Flags().StringVarP(&option.configFile, "config_file", "c", CONFIG_FILE_DEFAULT, "set location of config file")
-
+	cmd.Flags().StringVarP(&option.ConfigFile, "config_file", "c", CONFIG_FILE_DEFAULT, "set location of config file")
+	cmd.Flags().AddGoFlagSet(flag.CommandLine)
+	flag.CommandLine.Parse(nil)
 	return cmd
 }
