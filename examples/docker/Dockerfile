@@ -1,12 +1,11 @@
-FROM golang:latest
-MAINTAINER MP
+FROM ubuntu:14.04
+MAINTAINER NP
 
-RUN mkdir /go/scripts
+ADD active-proxy /acproxy/active-proxy
+ADD bootstrap.sh /acproxy/bootstrap.sh
+ADD config.yaml /acproxy/config.yaml
+RUN chmod u+x /acproxy/active-proxy && \
+    chmod u+x /acproxy/bootstrap.sh
+ENV PATH $PATH:/acproxy
 
-ADD active-proxy /go/scripts/active-proxy
-ADD bootstrap.sh /go/scripts/bootstrap.sh
-ADD config.yaml /go/scripts/config.yaml
-RUN chmod u+x /go/scripts/active-proxy
-RUN chmod u+x /go/scripts/bootstrap.sh
-ENV PATH $PATH:/go/scripts
-
+WORKDIR /acproxy

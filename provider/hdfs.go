@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -117,7 +116,10 @@ func (provider *HdfsProxyProvider) Proxy(r *http.Request) (*http.Response, error
 	defer provider.mutex.RUnlock()
 
 	if provider.State == PEND {
-		return nil, errors.New("hdfs proxy provider not in service temporarily")
+		return &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       util.ConvertString2ReadCloser("hdfs proxy provider not in service temporarily"),
+		}, nil
 	}
 
 	webhdfsPort := provider.Conf.GetString(WebHdfsPortConfKey)
@@ -125,13 +127,14 @@ func (provider *HdfsProxyProvider) Proxy(r *http.Request) (*http.Response, error
 	proxyReq, _ := NewProxyRequest(r, urlStr)
 	select {
 	case <-time.After(time.Millisecond * time.Duration(provider.Conf.GetInt(RequestTimeoutConfKey))):
-		return nil, errors.New(fmt.Sprintf("request %s timeout", r.RequestURI))
+		return &http.Response{
+			StatusCode: http.StatusRequestTimeout,
+			Body:       util.ConvertString2ReadCloser("request %s timeout", r.RequestURI),
+		}, nil
 
 	case resp := <-provider.Pool.Push(proxyReq):
 		return resp.Resp, resp.Error
 	}
-
-	return nil, errors.New(fmt.Sprintf("request %s failed", r.RequestURI))
 }
 
 func (provider *HdfsProxyProvider) GetStats() ProviderStats {

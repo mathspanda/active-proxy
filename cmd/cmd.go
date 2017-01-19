@@ -11,7 +11,7 @@ type Option struct {
 }
 
 const (
-	CONFIG_FILE_DEFAULT = "examples/config.yaml"
+	CONFIG_FILE_DEFAULT = "config.yaml"
 )
 
 func NewProxyCommand(startFunc func(configFile string)) *cobra.Command {
