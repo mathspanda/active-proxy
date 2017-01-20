@@ -13,10 +13,10 @@ type ZKClient struct {
 
 func NewZKClient(zkServers []string, timeout int) (*ZKClient, error) {
 	conn, _, err := zk.Connect(zkServers, time.Second*time.Duration(timeout))
-	conn.SetLogger(NilLogger{})
 	if err != nil {
 		return nil, err
 	}
+	conn.SetLogger(NilLogger{})
 
 	client := &ZKClient{zkServers: zkServers, conn: conn}
 	return client, nil

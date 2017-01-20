@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -74,7 +75,11 @@ func (provider *HdfsProxyProvider) resolveActiveNodeInfo(client *zkClient.ZKClie
 
 func (provider *HdfsProxyProvider) monitorZkLockPath() {
 	zkServers := strings.Split(provider.Conf.GetString(ZkServersConfKey), ",")
-	client, _ := zkClient.NewZKClient(zkServers, 1)
+	client, err := zkClient.NewZKClient(zkServers, 1)
+	if err != nil {
+		glog.Errorln("hdfs proxy provider: init zkclient fail,", err.Error())
+		os.Exit(-1)
+	}
 	success, ch := provider.resolveActiveNodeInfo(client)
 	if success {
 		provider.StateChan <- RUN
@@ -115,7 +120,7 @@ func (provider *HdfsProxyProvider) Proxy(r *http.Request) (*http.Response, error
 	provider.mutex.RLock()
 	defer provider.mutex.RUnlock()
 
-	if provider.State == PEND {
+	if provider.State != RUN {
 		return &http.Response{
 			StatusCode: http.StatusServiceUnavailable,
 			Body:       util.ConvertString2ReadCloser("hdfs proxy provider not in service temporarily"),
@@ -129,7 +134,7 @@ func (provider *HdfsProxyProvider) Proxy(r *http.Request) (*http.Response, error
 	case <-time.After(time.Millisecond * time.Duration(provider.Conf.GetInt(RequestTimeoutConfKey))):
 		return &http.Response{
 			StatusCode: http.StatusRequestTimeout,
-			Body:       util.ConvertString2ReadCloser("request %s timeout", r.RequestURI),
+			Body:       util.ConvertString2ReadCloser(fmt.Sprintf("request %s timeout", r.RequestURI)),
 		}, nil
 
 	case resp := <-provider.Pool.Push(proxyReq):
