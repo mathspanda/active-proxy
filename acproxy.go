@@ -25,7 +25,7 @@ func Start(configFile string) {
 		glog.Errorln("Error init proxy configuration: ", err)
 		os.Exit(-1)
 	}
-	glog.V(1).Infof("ProxyConf: %+v", conf)
+	glog.V(2).Infof("ProxyConf: %+v", conf)
 
 	proxyServer, err := NewProxyServer(*conf)
 	if err != nil {

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"active-proxy/util"
 
 	"github.com/golang/glog"
+	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
 )
 
@@ -24,16 +26,23 @@ type ProxyServer struct {
 }
 
 func NewProxyServer(conf ProxyConf) (*ProxyServer, error) {
+	if len(conf.ProviderConfs) == 0 {
+		return nil, errors.New("none proxy providers configured")
+	}
+
 	server := &ProxyServer{proxyConf: conf}
 	server.providers = make(map[ProviderType]ProxyProvider)
 	server.pools = make(map[ProviderType]util.ProxyTaskPoolInterface)
 
-	hdfsProvider, err := NewHdfsProxyProvider(conf.ProviderConfs[HDFS])
-	if err != nil {
-		return nil, err
+	// config hdfs proxy provider
+	if hdfsConf, ok := conf.ProviderConfs[HDFS]; ok {
+		hdfsProvider, err := NewHdfsProxyProvider(hdfsConf)
+		if err != nil {
+			return nil, err
+		}
+		server.providers[HDFS] = hdfsProvider
+		server.pools[HDFS] = hdfsProvider.Pool
 	}
-	server.providers[HDFS] = hdfsProvider
-	server.pools[HDFS] = hdfsProvider.Pool
 
 	server.statisticsMiddleware = middleware.NewStatisticsMiddleware(conf.RecentRequestNums)
 
@@ -41,23 +50,26 @@ func NewProxyServer(conf ProxyConf) (*ProxyServer, error) {
 }
 
 func (server *ProxyServer) StartServer() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", server.DefaultHandler)
-	mux.HandleFunc("/states", server.StatesHandler)
-	mux.HandleFunc("/statistics", server.StatisticsHandler)
+	router := mux.NewRouter()
+	router.PathPrefix("/states").HandlerFunc(server.StatesHandler)
+	router.PathPrefix("/statistics").HandlerFunc(server.StatisticsHandler)
 
-	n := negroni.New()
-	n.Use(server.statisticsMiddleware)
-	n.UseHandler(mux)
+	defaultRouter := mux.NewRouter()
+	defaultRouter.PathPrefix("/").HandlerFunc(server.DefaultHandler)
 
-	http.ListenAndServe(server.proxyConf.ProxyServerPort, n)
+	// specific middleware for default handler
+	router.PathPrefix("/").Handler(negroni.New(
+		server.statisticsMiddleware,
+		negroni.Wrap(defaultRouter),
+	))
+
+	http.ListenAndServe(server.proxyConf.ProxyServerPort, router)
 }
 
 func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Request) {
 	providerType := getProxyProviderType(r.URL.String())
 	if providerType == DEFAULT {
-		rw.WriteHeader(http.StatusNotFound)
-		io.WriteString(rw, "cannot find corresponding proxy provider")
+		http.Error(rw, "cannot find corresponding proxy provider", http.StatusNotFound)
 		return
 	}
 	for i := 0; i < server.proxyConf.RetryAttempts; i++ {
@@ -69,18 +81,16 @@ func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Reques
 		}
 		// bad request
 		if i == server.proxyConf.RetryAttempts-1 {
+			glog.V(1).Infof("Request %s still failed after retrying %d times.", r.URL.String(), i+1)
 			if resp != nil {
-				rw.WriteHeader(resp.StatusCode)
-				io.WriteString(rw, convertResponseBody2String(resp))
+				http.Error(rw, convertResponseBody2String(resp), resp.StatusCode)
 			} else {
-				rw.WriteHeader(http.StatusBadRequest)
-				io.WriteString(rw, err.Error())
+				http.Error(rw, err.Error(), http.StatusBadRequest)
 			}
 		} else {
 			time.Sleep(time.Millisecond * time.Duration(server.proxyConf.RetryDelay))
 		}
 	}
-	glog.V(2).Infof("Request %s still failed after retrying %d times.", r.RequestURI, server.proxyConf.RetryAttempts)
 }
 
 func convertResponseBody2String(response *http.Response) string {

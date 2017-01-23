@@ -3,7 +3,6 @@ package middleware
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -45,9 +44,6 @@ func (m *StatisticsMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request
 	respRecorder := &responseRecorder{rw, http.StatusOK}
 	begin := time.Now()
 	next(respRecorder, r)
-	if strings.HasPrefix(r.URL.Path, "/states") || strings.HasPrefix(r.URL.Path, "/statistics") {
-		return
-	}
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

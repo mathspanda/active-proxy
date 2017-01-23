@@ -35,16 +35,18 @@ func NewProxyConf(filePath string) (*ProxyConf, error) {
 		return nil, err
 	}
 
+	// global config
 	globalConf := convert2ProviderConf(m["GLOBAL"])
-	hdfsConf := convert2ProviderConf(m["HDFS"])
-
 	proxyPort := globalConf.GetString("PROXY_SERVER_PORT")
 	retryAttempts := globalConf.GetInt("PROXY_RETRY_ATTEMPTS")
 	retryDelay := globalConf.GetInt("PROXY_RETRY_DELAY")
 	recentRequestNums := globalConf.GetInt("PROXY_RECENT_REQUEST_NUMS")
 
+	// different providers' config
 	providerConfs := make(map[ProviderType]ProviderConf)
-	providerConfs[HDFS] = hdfsConf
+	if conf, ok := m["HDFS"]; ok {
+		providerConfs[HDFS] = convert2ProviderConf(conf)
+	}
 
 	return &ProxyConf{
 		GlobalConf: GlobalConf{

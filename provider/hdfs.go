@@ -65,7 +65,7 @@ func (provider *HdfsProxyProvider) resolveActiveNodeInfo(client *zkClient.ZKClie
 		activeNNInfo := &hadoop_hdfs.ActiveNodeInfo{}
 		proto.Unmarshal(data, activeNNInfo)
 		if provider.activeNNAddress != activeNNInfo.GetHostname() {
-			glog.V(1).Infof("hdfs proxy provider: active namenode address changes from %s to %s.", provider.activeNNAddress, activeNNInfo.GetHostname())
+			glog.V(2).Infof("hdfs proxy provider: active namenode address changes from %s to %s.", provider.activeNNAddress, activeNNInfo.GetHostname())
 			provider.activeNNAddress = activeNNInfo.GetHostname()
 		}
 		return true, ch
@@ -127,8 +127,8 @@ func (provider *HdfsProxyProvider) Proxy(r *http.Request) (*http.Response, error
 		}, nil
 	}
 
-	webhdfsPort := provider.Conf.GetString(WebHdfsPortConfKey)
-	urlStr := fmt.Sprintf("%s://%s:%s%s", "http", provider.activeNNAddress, webhdfsPort, r.RequestURI)
+	webHdfsPort := provider.Conf.GetString(WebHdfsPortConfKey)
+	urlStr := fmt.Sprintf("%s://%s:%s%s", "http", provider.activeNNAddress, webHdfsPort, r.RequestURI)
 	proxyReq, _ := NewProxyRequest(r, urlStr)
 	select {
 	case <-time.After(time.Millisecond * time.Duration(provider.Conf.GetInt(RequestTimeoutConfKey))):
