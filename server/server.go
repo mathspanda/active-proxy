@@ -74,11 +74,13 @@ func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Reques
 	}
 	for i := 0; i < server.proxyConf.RetryAttempts; i++ {
 		resp, err := server.providers[providerType].Proxy(r)
+
 		// good request
 		if err == nil && resp.StatusCode < 400 {
 			io.WriteString(rw, convertResponseBody2String(resp))
 			return
 		}
+
 		// bad request
 		if i == server.proxyConf.RetryAttempts-1 {
 			glog.V(1).Infof("Request %s still failed after retrying %d times.", r.URL.String(), i+1)
@@ -90,13 +92,16 @@ func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Reques
 		} else {
 			time.Sleep(time.Millisecond * time.Duration(server.proxyConf.RetryDelay))
 		}
+
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
 	}
 }
 
 func convertResponseBody2String(response *http.Response) string {
 	if response.Body != nil {
 		body, _ := ioutil.ReadAll(response.Body)
-		defer response.Body.Close()
 		return string(body)
 	}
 	return ""
