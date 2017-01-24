@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -27,7 +27,7 @@ type ProxyServer struct {
 
 func NewProxyServer(conf ProxyConf) (*ProxyServer, error) {
 	if len(conf.ProviderConfs) == 0 {
-		return nil, errors.New("none proxy providers configured")
+		return nil, fmt.Errorf("none proxy providers configured")
 	}
 
 	server := &ProxyServer{proxyConf: conf}
@@ -81,15 +81,22 @@ func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Reques
 			return
 		}
 
+		var errorMsg string
+		var statusCode int
+		if resp != nil {
+			errorMsg = convertResponseBody2String(resp)
+			statusCode = resp.StatusCode
+		} else {
+			errorMsg = err.Error()
+			statusCode = http.StatusBadRequest
+		}
+
 		// bad request
 		if i == server.proxyConf.RetryAttempts-1 {
-			glog.V(1).Infof("Request %s still failed after retrying %d times.", r.URL.String(), i+1)
-			if resp != nil {
-				http.Error(rw, convertResponseBody2String(resp), resp.StatusCode)
-			} else {
-				http.Error(rw, err.Error(), http.StatusBadRequest)
-			}
+			glog.V(1).Infof("Request %s still fails after retrying %d times: %s", r.URL.String(), i+1, errorMsg)
+			http.Error(rw, errorMsg, statusCode)
 		} else {
+			glog.V(3).Infof("Request %s fails at %d/%d times: %s", r.URL.String(), i+1, server.proxyConf.RetryAttempts, errorMsg)
 			time.Sleep(time.Millisecond * time.Duration(server.proxyConf.RetryDelay))
 		}
 
