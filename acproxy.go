@@ -19,8 +19,8 @@ func main() {
 	}
 }
 
-func Start(configFile string) {
-	conf, err := NewProxyConf(configFile)
+func Start(proxyType string, configFile string) {
+	conf, err := NewProxyConf(proxyType, configFile)
 	if err != nil {
 		glog.Errorln("Error init proxy configuration: ", err)
 		os.Exit(-1)

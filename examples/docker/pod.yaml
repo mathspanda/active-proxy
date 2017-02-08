@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: acproxy-pod-test
+  labels:
+    name: acproxy
+spec:
+  containers:
+  - name: acproxy
+    image: acproxy_v1 
+    imagePullPolicy: Always
+    env:
+    - name: HDFS_ZK_SERVERS
+      value: __ZOOKEEPER_SERVERS__ 
+    - name: HDFS_ZK_LOCK_PATH
+      value: __LOCK_PATH__ 
+    args:
+    # - /acproxy/active-proxy
+    - --type=hdfs
+    - --config_file=/acproxy/config.yaml
+    - --log_dir=/var/log
+    - --v=3
+    readinessProbe:
+      httpGet:
+        path: /states
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      successThreshold: 1
+      failureThreshold: 5
+      timeoutSeconds: 2
+    resources:
+      limits:
+        memory: 50Mi
+      requests:
+        cpu: 500m
+        memory: 50Mi

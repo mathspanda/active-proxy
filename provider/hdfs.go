@@ -110,6 +110,7 @@ func (provider *HdfsProxyProvider) monitorProviderState() {
 		state := <-provider.StateChan
 		provider.mutex.Lock()
 		if provider.State != state {
+			glog.V(2).Infof("hdfs proxy provider: state changes from %s to %s.", provider.State, state)
 			provider.State = state
 		}
 		provider.mutex.Unlock()

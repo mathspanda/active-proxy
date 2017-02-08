@@ -1,12 +1,10 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 
 	"active-proxy/middleware"
@@ -20,28 +18,24 @@ import (
 
 type ProxyServer struct {
 	proxyConf            ProxyConf
-	providers            map[ProviderType]ProxyProvider
-	pools                map[ProviderType]util.ProxyTaskPoolInterface
+	provider             ProxyProvider
+	pool                 util.ProxyTaskPoolInterface
 	statisticsMiddleware *middleware.StatisticsMiddleware
 }
 
 func NewProxyServer(conf ProxyConf) (*ProxyServer, error) {
-	if len(conf.ProviderConfs) == 0 {
-		return nil, fmt.Errorf("none proxy providers configured")
-	}
-
 	server := &ProxyServer{proxyConf: conf}
-	server.providers = make(map[ProviderType]ProxyProvider)
-	server.pools = make(map[ProviderType]util.ProxyTaskPoolInterface)
 
-	// config hdfs proxy provider
-	if hdfsConf, ok := conf.ProviderConfs[HDFS]; ok {
-		hdfsProvider, err := NewHdfsProxyProvider(hdfsConf)
+	switch conf.ProxyProviderType {
+	case "hdfs":
+		hdfsProvider, err := NewHdfsProxyProvider(conf.ProxyProviderConf)
 		if err != nil {
 			return nil, err
 		}
-		server.providers[HDFS] = hdfsProvider
-		server.pools[HDFS] = hdfsProvider.Pool
+		server.provider = hdfsProvider
+		server.pool = hdfsProvider.Pool
+	default:
+		return nil, fmt.Errorf("invalid proxy provider: %s", conf.ProxyProviderType)
 	}
 
 	server.statisticsMiddleware = middleware.NewStatisticsMiddleware(conf.RecentRequestNums)
@@ -67,13 +61,8 @@ func (server *ProxyServer) StartServer() {
 }
 
 func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Request) {
-	providerType := getProxyProviderType(r.URL.String())
-	if providerType == DEFAULT {
-		http.Error(rw, "cannot find corresponding proxy provider", http.StatusNotFound)
-		return
-	}
 	for i := 0; i < server.proxyConf.RetryAttempts; i++ {
-		resp, err := server.providers[providerType].Proxy(r)
+		resp, err := server.provider.Proxy(r)
 
 		// good request
 		if err == nil && resp.StatusCode < 400 {
@@ -115,28 +104,9 @@ func convertResponseBody2String(response *http.Response) string {
 }
 
 func (server *ProxyServer) StatesHandler(rw http.ResponseWriter, r *http.Request) {
-	providerStats := make(map[string]ProviderStats)
-	for providerType, provider := range server.providers {
-		providerStats[providerType.String()] = provider.GetStats()
-	}
-	buf, _ := json.Marshal(providerStats)
-	io.WriteString(rw, string(buf))
+	io.WriteString(rw, server.provider.GetStats().Json())
 }
 
 func (server *ProxyServer) StatisticsHandler(rw http.ResponseWriter, r *http.Request) {
 	io.WriteString(rw, server.statisticsMiddleware.Json())
-}
-
-const (
-	WEBHDFS_PREFIX = "/webhdfs/v1"
-)
-
-// decide proxy provider type according to some rules
-func getProxyProviderType(urlPath string) ProviderType {
-	switch {
-	case strings.HasPrefix(urlPath, WEBHDFS_PREFIX):
-		return HDFS
-	default:
-		return DEFAULT
-	}
 }

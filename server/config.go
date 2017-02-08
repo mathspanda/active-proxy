@@ -1,8 +1,10 @@
 package server
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	. "active-proxy/provider"
 
@@ -11,7 +13,9 @@ import (
 
 type ProxyConf struct {
 	GlobalConf
-	ConfigFile string
+	ConfigFile        string
+	ProxyProviderType string
+	ProxyProviderConf ProviderConf
 }
 
 type GlobalConf struct {
@@ -19,11 +23,9 @@ type GlobalConf struct {
 	RetryAttempts     int
 	RetryDelay        int
 	RecentRequestNums int
-
-	ProviderConfs map[ProviderType]ProviderConf
 }
 
-func NewProxyConf(filePath string) (*ProxyConf, error) {
+func NewProxyConf(providerType string, filePath string) (*ProxyConf, error) {
 	absFilePath, _ := filepath.Abs(filePath)
 	data, err := ioutil.ReadFile(absFilePath)
 	if err != nil {
@@ -42,10 +44,11 @@ func NewProxyConf(filePath string) (*ProxyConf, error) {
 	retryDelay := globalConf.GetInt("PROXY_RETRY_DELAY")
 	recentRequestNums := globalConf.GetInt("PROXY_RECENT_REQUEST_NUMS")
 
-	// different providers' config
-	providerConfs := make(map[ProviderType]ProviderConf)
-	if conf, ok := m["HDFS"]; ok {
-		providerConfs[HDFS] = convert2ProviderConf(conf)
+	var providerConf ProviderConf
+	if conf, ok := m[strings.ToUpper(providerType)]; ok {
+		providerConf = convert2ProviderConf(conf)
+	} else {
+		return nil, fmt.Errorf("cannot find %s proxy provider configuration in file %s", providerType, filePath)
 	}
 
 	return &ProxyConf{
@@ -54,9 +57,10 @@ func NewProxyConf(filePath string) (*ProxyConf, error) {
 			RetryAttempts:     retryAttempts,
 			RetryDelay:        retryDelay,
 			RecentRequestNums: recentRequestNums,
-			ProviderConfs:     providerConfs,
 		},
-		ConfigFile: absFilePath,
+		ConfigFile:        absFilePath,
+		ProxyProviderType: providerType,
+		ProxyProviderConf: providerConf,
 	}, nil
 }
 

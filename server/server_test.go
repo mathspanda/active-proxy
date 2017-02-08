@@ -45,8 +45,7 @@ func prepare() {
 			},
 		}
 		server = &ProxyServer{proxyConf: conf}
-		server.providers = make(map[ProviderType]ProxyProvider)
-		server.providers[HDFS] = &mockHDFSProxyProvider{}
+		server.provider = &mockHDFSProxyProvider{}
 		server.statisticsMiddleware = middleware.NewStatisticsMiddleware(conf.RecentRequestNums)
 		go server.StartServer()
 		runtime.Gosched()
@@ -54,21 +53,16 @@ func prepare() {
 }
 
 const (
-	DefaultUrl = "http://localhost:8080/default"
-	HdfsUrl    = "http://localhost:8080/webhdfs/v1"
+	HdfsUrl = "http://localhost:8080/webhdfs/v1"
 )
 
 func TestDefaultHandler(t *testing.T) {
 	prepare()
 
 	client := http.Client{}
-	request, _ := http.NewRequest("GET", DefaultUrl, nil)
-	resp, _ := client.Do(request)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-	resp.Body.Close()
 
-	request, _ = http.NewRequest("GET", HdfsUrl, nil)
-	resp, _ = client.Do(request)
+	request, _ := http.NewRequest("GET", HdfsUrl, nil)
+	resp, _ := client.Do(request)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "/webhdfs/v1", convertResponseBody2String(resp))
 	resp.Body.Close()
@@ -88,23 +82,16 @@ func TestStatesHandler(t *testing.T) {
 	respData, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 
-	statesMap := make(map[string]ProviderStats)
-	json.Unmarshal(respData, &statesMap)
-	assert.Equal(t, len(server.providers), len(statesMap))
-	for providerType, provider := range server.providers {
-		if providerState, ok := statesMap[providerType.String()]; ok {
-			assert.Equal(t, provider.GetStats(), providerState)
-		}
-	}
+	var state ProviderStats
+	json.Unmarshal(respData, &state)
+	assert.Equal(t, server.provider.GetStats(), state)
 }
 
 func TestStatisticsHandler(t *testing.T) {
 	prepare()
 
 	client := http.Client{}
-	request, _ := http.NewRequest("GET", DefaultUrl, nil)
-	client.Do(request)
-	request, _ = http.NewRequest("GET", HdfsUrl, nil)
+	request, _ := http.NewRequest("GET", HdfsUrl, nil)
 	client.Do(request)
 	request, _ = http.NewRequest("POST", HdfsUrl, nil)
 	client.Do(request)
@@ -120,12 +107,11 @@ func TestStatisticsHandler(t *testing.T) {
 	if stats, ok := statisticsMap["recentRequests"]; ok {
 		statsSlice := convert2RequestsRecords(stats.([]interface{}))
 		statsLen := len(statsSlice)
-		if statsLen < 3 {
+		if statsLen < 2 {
 			t.Error("TestStatisticsHandler:", "less recent requests")
 		}
 		assert.Equal(t, http.StatusMethodNotAllowed, statsSlice[statsLen-1].StatusCode)
 		assert.Equal(t, http.StatusOK, statsSlice[statsLen-2].StatusCode)
-		assert.Equal(t, http.StatusNotFound, statsSlice[statsLen-3].StatusCode)
 	} else {
 		t.Error("TestStatisticsHandler:", "lack recent requests")
 	}

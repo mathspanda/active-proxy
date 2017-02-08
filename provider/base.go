@@ -71,6 +71,10 @@ type ProviderStats struct {
 	Explain string `json:"state_explanation"`
 }
 
+func (stats ProviderStats) Json() string {
+	return util.JsonMarshal(stats)
+}
+
 // ProxyProvider defines methods of a provider
 type ProxyProvider interface {
 	Proxy(r *http.Request) (*http.Response, error)
