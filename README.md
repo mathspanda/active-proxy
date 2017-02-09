@@ -1,4 +1,4 @@
-## proxy
+## acproxy
 a proxy interacting with hadoop clusters, which supports:
 
 * proxy webhdfs request to active namenode instead of standby namenode (if send requests to standby namenode, standbyexception will return)

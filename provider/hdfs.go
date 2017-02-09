@@ -117,29 +117,22 @@ func (provider *HdfsProxyProvider) monitorProviderState() {
 	}
 }
 
-func (provider *HdfsProxyProvider) Proxy(r *http.Request) (*http.Response, error) {
+func (provider *HdfsProxyProvider) Proxy(rw http.ResponseWriter, r *http.Request) int {
 	provider.mutex.RLock()
 	defer provider.mutex.RUnlock()
 
 	if provider.State != RUN {
-		return &http.Response{
-			StatusCode: http.StatusServiceUnavailable,
-			Body:       util.ConvertString2ReadCloser("hdfs proxy provider not in service temporarily"),
-		}, nil
+		return http.StatusServiceUnavailable
 	}
 
-	webHdfsPort := provider.Conf.GetString(WebHdfsPortConfKey)
-	urlStr := fmt.Sprintf("%s://%s:%s%s", "http", provider.activeNNAddress, webHdfsPort, r.RequestURI)
-	proxyReq, _ := NewProxyRequest(r, urlStr)
+	port := provider.Conf.GetString(WebHdfsPortConfKey)
+	url := fmt.Sprintf("%s://%s:%s", "http", provider.activeNNAddress, port)
 	select {
 	case <-time.After(time.Millisecond * time.Duration(provider.Conf.GetInt(RequestTimeoutConfKey))):
-		return &http.Response{
-			StatusCode: http.StatusRequestTimeout,
-			Body:       util.ConvertString2ReadCloser(fmt.Sprintf("request %s timeout", r.RequestURI)),
-		}, nil
+		return http.StatusRequestTimeout
 
-	case resp := <-provider.Pool.Push(proxyReq):
-		return resp.Resp, resp.Error
+	case <-provider.Pool.Push(url, rw, r):
+		return http.StatusOK
 	}
 }
 

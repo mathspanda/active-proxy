@@ -2,20 +2,19 @@ package util
 
 import (
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 )
 
-type ProxyTaskResult struct {
-	Resp  *http.Response
-	Error error
-}
-
 type ProxyTask struct {
-	Req      *http.Request
-	RespChan chan ProxyTaskResult
+	RespChan       chan bool
+	target         string
+	request        *http.Request
+	responseWriter http.ResponseWriter
 }
 
 type ProxyTaskPoolInterface interface {
-	Push(request *http.Request) <-chan ProxyTaskResult
+	Push(string, http.ResponseWriter, *http.Request) <-chan bool
 	Do()
 }
 
@@ -33,8 +32,13 @@ func NewProxyTaskPool(maxTaskNum int) (ProxyTaskPoolInterface, error) {
 	return pool, nil
 }
 
-func (pool *ProxyTaskPool) Push(request *http.Request) <-chan ProxyTaskResult {
-	task := ProxyTask{Req: request, RespChan: make(chan ProxyTaskResult)}
+func (pool *ProxyTaskPool) Push(target string, rw http.ResponseWriter, r *http.Request) <-chan bool {
+	task := ProxyTask{
+		RespChan:       make(chan bool),
+		target:         target,
+		request:        r,
+		responseWriter: rw,
+	}
 	pool.doChan <- 1
 	pool.taskChan <- task
 	return task.RespChan
@@ -44,10 +48,11 @@ func (pool *ProxyTaskPool) Do() {
 	for {
 		task := <-pool.taskChan
 		go func(task ProxyTask) {
-			httpClient := http.Client{}
-			resp, err := httpClient.Do(task.Req)
-			task.RespChan <- ProxyTaskResult{Resp: resp, Error: err}
+			targetUrl, _ := url.Parse(task.target)
+			reverseProxy := httputil.NewSingleHostReverseProxy(targetUrl)
+			reverseProxy.ServeHTTP(task.responseWriter, task.request)
 			<-pool.doChan
+			task.RespChan <- true
 		}(task)
 	}
 }

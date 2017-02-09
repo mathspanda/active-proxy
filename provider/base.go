@@ -77,7 +77,7 @@ func (stats ProviderStats) Json() string {
 
 // ProxyProvider defines methods of a provider
 type ProxyProvider interface {
-	Proxy(r *http.Request) (*http.Response, error)
+	Proxy(rw http.ResponseWriter, r *http.Request) int
 	GetStats() ProviderStats
 }
 
@@ -88,13 +88,4 @@ type BaseProxyProvider struct {
 	StateChan chan ProviderState
 	Type      ProviderType
 	Pool      util.ProxyTaskPoolInterface
-}
-
-func NewProxyRequest(req *http.Request, urlStr string) (*http.Request, error) {
-	proxyReq, err := http.NewRequest(req.Method, urlStr, req.Body)
-	if err != nil {
-		return nil, err
-	}
-	proxyReq.Header = req.Header
-	return proxyReq, nil
 }

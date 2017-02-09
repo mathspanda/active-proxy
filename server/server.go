@@ -62,22 +62,17 @@ func (server *ProxyServer) StartServer() {
 
 func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Request) {
 	for i := 0; i < server.proxyConf.RetryAttempts; i++ {
-		resp, err := server.provider.Proxy(r)
-
-		// good request
-		if err == nil && resp.StatusCode < 400 {
-			io.WriteString(rw, convertResponseBody2String(resp))
+		statusCode := server.provider.Proxy(rw, r)
+		if statusCode < 400 {
 			return
 		}
 
 		var errorMsg string
-		var statusCode int
-		if resp != nil {
-			errorMsg = convertResponseBody2String(resp)
-			statusCode = resp.StatusCode
-		} else {
-			errorMsg = err.Error()
-			statusCode = http.StatusBadRequest
+		switch statusCode {
+		case http.StatusServiceUnavailable:
+			errorMsg = fmt.Sprintf("%s proxy provider not in service temporarily", server.proxyConf.ProxyProviderType)
+		case http.StatusRequestTimeout:
+			errorMsg = fmt.Sprintf("request %s timeout", r.RequestURI)
 		}
 
 		// bad request
@@ -87,10 +82,6 @@ func (server *ProxyServer) DefaultHandler(rw http.ResponseWriter, r *http.Reques
 		} else {
 			glog.V(3).Infof("Request %s fails at %d/%d times: %s", r.URL.String(), i+1, server.proxyConf.RetryAttempts, errorMsg)
 			time.Sleep(time.Millisecond * time.Duration(server.proxyConf.RetryDelay))
-		}
-
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
 		}
 	}
 }

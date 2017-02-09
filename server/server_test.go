@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
-	"strings"
 	"testing"
 
 	"active-proxy/middleware"
@@ -18,14 +17,11 @@ type mockHDFSProxyProvider struct {
 	ProxyProvider
 }
 
-func (provider *mockHDFSProxyProvider) Proxy(request *http.Request) (*http.Response, error) {
+func (provider *mockHDFSProxyProvider) Proxy(rw http.ResponseWriter, request *http.Request) int {
 	if request.Method == "GET" {
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       ioutil.NopCloser(strings.NewReader(request.RequestURI)),
-		}, nil
+		return http.StatusOK
 	}
-	return &http.Response{StatusCode: http.StatusMethodNotAllowed}, nil
+	return http.StatusMethodNotAllowed
 }
 
 func (provider *mockHDFSProxyProvider) GetStats() ProviderStats {
@@ -64,7 +60,6 @@ func TestDefaultHandler(t *testing.T) {
 	request, _ := http.NewRequest("GET", HdfsUrl, nil)
 	resp, _ := client.Do(request)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "/webhdfs/v1", convertResponseBody2String(resp))
 	resp.Body.Close()
 
 	request, _ = http.NewRequest("POST", HdfsUrl, nil)

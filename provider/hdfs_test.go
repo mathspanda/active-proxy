@@ -18,9 +18,9 @@ type mockPool struct {
 	util.ProxyTaskPoolInterface
 }
 
-func (pool *mockPool) Push(request *http.Request) <-chan util.ProxyTaskResult {
-	respChan := make(chan util.ProxyTaskResult, 1)
-	respChan <- util.ProxyTaskResult{Resp: &http.Response{StatusCode: 200, Request: request}}
+func (pool *mockPool) Push(target string, rw http.ResponseWriter, r *http.Request) <-chan bool {
+	respChan := make(chan bool, 1)
+	respChan <- true
 	return respChan
 }
 
@@ -97,11 +97,6 @@ func TestProviderProxy(t *testing.T) {
 	zkClient.Create(provider.zkLockPath, marshalActiveNodeInfo("localhost"))
 	time.Sleep(time.Duration(3) * time.Second)
 
-	response, err := provider.Proxy(&http.Request{Method: "GET"})
-	if err != nil {
-		t.Error("TestProviderProxy:", err.Error())
-	}
-	proxyUrlStr := fmt.Sprintf("localhost:%s", provider.Conf.GetString(WebHdfsPortConfKey))
-	assert.Equal(t, http.StatusOK, response.StatusCode)
-	assert.Equal(t, proxyUrlStr, response.Request.Host)
+	response := provider.Proxy(nil, &http.Request{Method: "GET"})
+	assert.Equal(t, http.StatusOK, response)
 }
